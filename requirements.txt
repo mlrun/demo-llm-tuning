@@ -1,0 +1,8 @@
+mlrun
+torch
+plotly
+gradio
+transformers
+datasets
+accelerate
+evaluate
