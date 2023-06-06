@@ -22,7 +22,7 @@ all:
 
 .PHONY: install-requirements
 install-requirements: ## Install all requirements needed for development
-	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
+	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt -r dev-requirements.txt
 
 
 .PHONY: package-wheel
