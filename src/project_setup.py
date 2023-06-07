@@ -10,7 +10,7 @@ def assert_build():
         "datasets",
         "accelerate",
         "evaluate",
-        "deeppspeed",
+        "deepspeed",
         "mpi4py",
     ]:
         module = importlib.import_module(module_name)
@@ -27,6 +27,19 @@ def create_and_set_project(
     num_cpus_per_replica: int = 32,
     memory_per_replica: str = "244Gi",
 ):
+    """
+    Creating the project for this demo.
+    :param git_source:              the git source of the project.
+    :param name:                    project name
+    :param default_image:           the default image of the project
+    :param user_project:            whether to add username to the project name
+    :param num_replicas:            number of workers for training
+    :param num_gpus_per_replica:    number of GPUs per worker
+    :param num_cpus_per_replica:    number of CPUs per worker
+    :param memory_per_replica:      amount of memory per worker
+
+    :return: a fully prepared project for this demo.
+    """
     # Get / Create a project from the MLRun DB:
     project = mlrun.get_or_create_project(
         name=name, context="./", user_project=user_project
@@ -44,7 +57,7 @@ def create_and_set_project(
                 image="mlrun/ml-models-gpu",
                 requirements=[
                     "torch",
-                    "transformers[deeppspeed]",
+                    "transformers[deepspeed]",
                     "datasets",
                     "accelerate",
                     "evaluate",
@@ -64,14 +77,14 @@ def create_and_set_project(
         name="data-collecting",
         kind="job",
     )
-    
+
     # Set the data preprocessing function:
     project.set_function(
         "src/data_preprocess.py",
         name="data-preparing",
         kind="job",
     )
-    
+
     # Set the training function (gpu and without gpu for evaluation):
     train_function = project.set_function(
         "src/trainer.py",
@@ -91,9 +104,8 @@ def create_and_set_project(
         "src/trainer.py",
         name="training",
         kind="job",
-        
     )
-    
+
     project.set_function(
         "src/serving.py",
         name="serving",
@@ -101,7 +113,7 @@ def create_and_set_project(
         image="yonishelach/mlrun-hf-gpu",
     )
 
-    # Set the training worflow:
+    # Set the training workflow:
     project.set_workflow("training_workflow", "src/training_workflow.py")
 
     # Save and return the project:

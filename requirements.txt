@@ -6,3 +6,4 @@ transformers
 datasets
 accelerate
 evaluate
+bs4

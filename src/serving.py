@@ -1,15 +1,14 @@
+import json
 import os
 import zipfile
-import json
-from typing import Any, Dict, Union
-import numpy as np
-import transformers
+from typing import Any, Dict
 
-import mlrun.artifacts
-from mlrun.serving.v2_serving import V2ModelServer
-
-import torch
 import evaluate
+import mlrun.artifacts
+import numpy as np
+import torch
+import transformers
+from mlrun.serving.v2_serving import V2ModelServer
 
 SUBJECT_MARK = "Subject: "
 CONTENT_MARK = "\nContent: "
@@ -17,22 +16,31 @@ PROMPT_FORMAT = SUBJECT_MARK + "{}" + CONTENT_MARK
 
 
 def preprocess(request: dict) -> dict:
+    """
+    convert the request to the required structure for the predict function
+
+    :param request: A http request that contains the prompt
+    """
     # Read bytes:
     if isinstance(request, bytes):
         request = json.loads(request)
 
     # Get the prompt:
     prompt = request.pop("prompt")
-    
+
     # Format the prompt as subject:
     prompt = PROMPT_FORMAT.format(str(prompt))
-    
+
     # Update the request and return:
     request = {"inputs": [{"prompt": [prompt], **request}]}
     return request
 
 
 class LLMModelServer(V2ModelServer):
+    """
+    This is temporary and will be built in mlrun 1.5.0
+    """
+
     def __init__(
         self,
         context: mlrun.MLClientCtx = None,
@@ -83,7 +91,7 @@ class LLMModelServer(V2ModelServer):
         self._model_class = getattr(transformers, self.model_class)
         self._tokenizer_class = getattr(transformers, self.tokenizer_class)
 
-        # Load the model and tokinzer:
+        # Load the model and tokenizer:
         if self.model_path:
             self._load_from_mlrun()
         else:
@@ -150,7 +158,7 @@ class LLMModelServer(V2ModelServer):
             num_return_sequences=1,
             attention_mask=attention_mask,
             pad_token_id=pad_token_id,
-            **kwargs
+            **kwargs,
         )
 
         # Detokenize:
@@ -163,6 +171,9 @@ class LLMModelServer(V2ModelServer):
 
 
 def postprocess(inputs: dict) -> dict:
+    """
+    Postprocessing the generated output of the model
+    """
     # Read the prediction:
     prediction = inputs["outputs"]["prediction"]
 
@@ -173,10 +184,18 @@ def postprocess(inputs: dict) -> dict:
     else:
         output = prediction[content_index + len(CONTENT_MARK) :]
 
-    return {"inputs": [{"prediction": output.strip(), "prompt": inputs["outputs"]["prompt"]}]}
+    return {
+        "inputs": [
+            {"prediction": output.strip(), "prompt": inputs["outputs"]["prompt"]}
+        ]
+    }
 
 
 class ToxicityClassifierModelServer(V2ModelServer):
+    """
+    model that checks if the text contain toxicity language.
+    """
+
     def __init__(self, context, name: str, threshold: float = 0.7, **class_args):
         # Initialize the base server:
         super(ToxicityClassifierModelServer, self).__init__(
