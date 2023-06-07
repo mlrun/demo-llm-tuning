@@ -1,10 +1,11 @@
-import os
-from pathlib import Path
-from datasets import load_dataset
 import json
-import zipfile
+import os
 import tempfile
+import zipfile
+from pathlib import Path
+
 import mlrun
+from datasets import load_dataset
 
 ARTICLE_TOKEN = "Article: "
 HEADER_TOKEN = "Subject: "
@@ -14,7 +15,14 @@ Content: {}"""
 END_OF_ARTICLE = "Latest Posts"
 
 
-def convert_textfile_to_data_with_prompts(txt_file):
+def convert_textfile_to_data_with_prompts(txt_file: Path):
+    """
+    Formatting the html text content into prompt form.
+    Each header-content in the article is an element in the generated list of prompts
+
+    :param txt_file: text content as a string with tokens of headers.
+    :returns: list of prompts
+    """
     # Read file:
     with open(txt_file, "r") as f:
         lines = f.readlines()
@@ -56,11 +64,18 @@ def convert_textfile_to_data_with_prompts(txt_file):
 
 @mlrun.handler(outputs=["html-data:dataset"])
 def prepare_dataset(source_dir: str):
+    """
+    Build the dataset from text files as a 'text: prompt' structure.
+
+    :param source_dir: the directory that contains all the text files.
+
+    :returns: A dataset with all the prompts inside
+    """
     with zipfile.ZipFile(source_dir, "r") as zip_file:
         tmp_dir = tempfile.mkdtemp()
         zip_file.extractall(tmp_dir)
-        
-    path_list = Path(tmp_dir).glob(f"./*.txt")
+
+    path_list = Path(tmp_dir).glob("./*.txt")
     data = []
     # Converting text files into data in our prompt format:
     for path in path_list:

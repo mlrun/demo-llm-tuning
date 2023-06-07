@@ -35,7 +35,7 @@ def kfpipeline(
     )
 
     # Training:
-    train_function = project.get_function("mpi-training")
+    project.get_function("mpi-training")
 
     training_run = mlrun.run_function(
         function="mpi-training",

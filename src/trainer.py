@@ -1,34 +1,28 @@
 import json
 import os
-import zipfile
-
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "true"
-
-import torch
 import shutil
 import tempfile
-
+import zipfile
 from abc import ABC
 from typing import Any, Dict, List
 
 import mlrun
 import numpy as np
 import pandas as pd
+import torch
 import transformers
-
 from datasets import Dataset
-from mlrun import MLClientCtx
-
-from mlrun.artifacts import Artifact, PlotlyArtifact
+from mlrun.artifacts.manager import Artifact, PlotlyArtifact
 from mlrun.datastore import DataItem
+from mlrun.execution import MLClientCtx
 from mlrun.frameworks._common import CommonTypes, MLRunInterface
 from mlrun.utils import create_class
 from plotly import graph_objects as go
-
 from transformers import (
     AutoTokenizer,
     DataCollatorForLanguageModeling,
+    GPT2LMHeadModel,
+    GPT2Tokenizer,
     PreTrainedModel,
     PreTrainedTokenizer,
     Trainer,
@@ -36,9 +30,10 @@ from transformers import (
     TrainerControl,
     TrainerState,
     TrainingArguments,
-    GPT2Tokenizer,
-    GPT2LMHeadModel,
 )
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "true"
 
 DEEPSPEED_CONFIG = {
     "fp16": {
@@ -47,38 +42,29 @@ DEEPSPEED_CONFIG = {
         "loss_scale_window": 1000,
         "initial_scale_power": 16,
         "hysteresis": 2,
-        "min_loss_scale": 1
+        "min_loss_scale": 1,
     },
-
     "optimizer": {
         "type": "AdamW",
         "params": {
             "lr": "auto",
             "betas": "auto",
             "eps": "auto",
-            "weight_decay": "auto"
-        }
+            "weight_decay": "auto",
+        },
     },
-
     "scheduler": {
         "type": "WarmupLR",
         "params": {
             "warmup_min_lr": "auto",
             "warmup_max_lr": "auto",
-            "warmup_num_steps": "auto"
-        }
+            "warmup_num_steps": "auto",
+        },
     },
-
     "zero_optimization": {
         "stage": 3,
-        "offload_optimizer": {
-            "device": "cpu",
-            "pin_memory": True
-        },
-        "offload_param": {
-            "device": "cpu",
-            "pin_memory": True
-        },
+        "offload_optimizer": {"device": "cpu", "pin_memory": True},
+        "offload_param": {"device": "cpu", "pin_memory": True},
         "overlap_comm": True,
         "contiguous_gradients": True,
         "sub_group_size": 1e9,
@@ -87,9 +73,8 @@ DEEPSPEED_CONFIG = {
         "stage3_param_persistence_threshold": "auto",
         "stage3_max_live_parameters": 1e9,
         "stage3_max_reuse_distance": 1e9,
-        "stage3_gather_16bit_weights_on_model_save": True
+        "stage3_gather_16bit_weights_on_model_save": True,
     },
-
     "gradient_accumulation_steps": "auto",
     "gradient_clipping": "auto",
     "steps_per_print": 2000,
@@ -97,16 +82,18 @@ DEEPSPEED_CONFIG = {
     "train_micro_batch_size_per_gpu": "auto",
     "wall_clock_breakdown": False,
     "comms_logger": {
-      "enabled": True,
-      "verbose": False,
-      "prof_all": True,
-      "debug": False
-    }
+        "enabled": True,
+        "verbose": False,
+        "prof_all": True,
+        "debug": False,
+    },
 }
+
 
 # ----------------------from MLRUN--------------------------------
 class HFTrainerMLRunInterface(MLRunInterface, ABC):
     """
+    This is temporary and will be built in mlrun 1.5.0
     Interface for adding MLRun features for tensorflow keras API.
     """
 
@@ -148,6 +135,7 @@ class HFTrainerMLRunInterface(MLRunInterface, ABC):
 
 class MLRunCallback(TrainerCallback):
     """
+    This is temporary and will be built in mlrun 1.5.0
     Callback for collecting logs during training / evaluation of the `Trainer` API.
     """
 
@@ -303,6 +291,9 @@ def apply_mlrun(
     extra_data: dict = None,
     **kwargs,
 ):
+    """
+    This is temporary and will be built in mlrun 1.5.0
+    """
     # Get parameters defaults:
     if context is None:
         context = mlrun.get_or_create_ctx(HFTrainerMLRunInterface.DEFAULT_CONTEXT_NAME)
@@ -348,6 +339,9 @@ def train(
     model_name: str = "huggingface-model",
     use_deepspeed: bool = True,
 ):
+    """
+    This is temporary and will be built in mlrun 1.5.0
+    """
     torch.cuda.empty_cache()
     deepspeed_config_json = None
     if use_deepspeed:
@@ -444,6 +438,14 @@ def train(
 
 
 def evaluate(context, model_path, data: pd.DataFrame):
+    """
+    Evaluating the model using perplexity, for more information visit:
+    https://huggingface.co/docs/transformers/perplexity
+
+    :param context:     mlrun context
+    :param model_path:  path to the model directory
+    :param data:        the data to evaluate the model
+    """
     # Get the model artifact and file:
     (
         model_file,
