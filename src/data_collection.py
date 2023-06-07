@@ -181,7 +181,7 @@ def get_html_as_string(url: str, mark_headers: bool) -> str:
     :param url:             html URL
     :param mark_headers:    Whether to add article and header prefixes to headers to text
 
-    :return:                html text content
+    :returns:                html text content
     """
     # read html source:
     req = Request(url=url, headers={"User-Agent": "Mozilla/5.0"})
@@ -200,7 +200,7 @@ def collect_html_to_text_files(urls, mark_headers=True) -> str:
     :param urls:            html URLs
     :param mark_headers:    Whether to add article and header prefixes to headers to text
 
-    :return:  the directory name that contains all the content text files.
+    :returns:  the directory name that contains all the content text files.
     """
     directory = "html_as_text_files"
     os.makedirs(directory, exist_ok=True)

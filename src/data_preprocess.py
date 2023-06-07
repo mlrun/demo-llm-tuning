@@ -21,7 +21,7 @@ def convert_textfile_to_data_with_prompts(txt_file: Path):
     Each header-content in the article is an element in the generated list of prompts
 
     :param txt_file: text content as a string with tokens of headers.
-    :return: list of prompts
+    :returns: list of prompts
     """
     # Read file:
     with open(txt_file, "r") as f:
@@ -69,7 +69,7 @@ def prepare_dataset(source_dir: str):
 
     :param source_dir: the directory that contains all the text files.
 
-    :return: A dataset with all the prompts inside
+    :returns: A dataset with all the prompts inside
     """
     with zipfile.ZipFile(source_dir, "r") as zip_file:
         tmp_dir = tempfile.mkdtemp()

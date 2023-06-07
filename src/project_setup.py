@@ -38,7 +38,7 @@ def create_and_set_project(
     :param num_cpus_per_replica:    number of CPUs per worker
     :param memory_per_replica:      amount of memory per worker
 
-    :return: a fully prepared project for this demo.
+    :returns: a fully prepared project for this demo.
     """
     # Get / Create a project from the MLRun DB:
     project = mlrun.get_or_create_project(
