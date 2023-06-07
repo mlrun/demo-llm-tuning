@@ -18,7 +18,7 @@ You can find all the python source code under [/src](./src)
 
 [<img src="./images/video-thumbnail.png" style="width: 700px"/>](http://www.youtube.com/watch?v=aAU54bTH6_o "MLOps for Generative AI with MLRun")
 
-Be sure to check out Yaron Haviv's video [Deploying Hugging Face Models to Production at Scale with GPUs](https://www.nvidia.com/en-us/on-demand/session/gtcspring23-s51553/)
+Be sure to check out Yaron Haviv's video [Deploying Hugging Face Models to Production at Scale with GPUs](http://www.youtube.com/watch?v=aAU54bTH6_o)
 to get a walkthrough of a simillar demo.
 
 ___
