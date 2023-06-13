@@ -340,7 +340,17 @@ def train(
     use_deepspeed: bool = True,
 ):
     """
-    This is temporary and will be built in mlrun 1.5.0
+    Training a model with HuggingFace transformers api.
+
+    :param context:                 MLRun context
+    :param dataset:                 The uri of the training dataset, should be passed as input.
+    :param pretrained_tokenizer:    the pretrained tokenizer name that correspond the model.
+                                    (supported by Hugging Face API)
+    :param pretrained_model:        the pretrained model name to train (supported by Hugging Face API)
+    :param model_class:             The model class of the model, e.g., "transformers.GPT2LMHeadModel"
+    :param tokenizer_class:         The tokenizer class of the model, e.g., "transformers.AutoTokenizer"
+    :param model_name:              The name of the trained model (will be saved in the project with this name)
+    :param use_deepspeed:           Either to use deepspeed or not. Recommended for fine-tuning LLMs.
     """
     torch.cuda.empty_cache()
     deepspeed_config_json = None
