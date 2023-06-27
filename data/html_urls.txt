@@ -87,7 +87,6 @@ https://www.iguazio.com/blog/cloud-data-services-sprawl-its-complicated/
 https://www.iguazio.com/blog/predicting-1st-day-churn-in-real-time/
 https://www.iguazio.com/blog/machine-learning-experiment-tracking-from-zero-to-hero-in-2-lines-of-code/
 https://www.iguazio.com/blog/how-to-bring-breakthrough-performance-and-productivity-to-ai-ml-projects/
-https://www.iguazio.com/blog/
 https://www.iguazio.com/blog/how-to-deploy-an-mlrun-project-in-a-ci-cd-process-with-jenkins-pipeline/
 https://www.iguazio.com/blog/iguazio-named-in-forresters-now-tech-ai-ml-platforms-q1-2022/
 https://www.iguazio.com/blog/the-complete-guide-to-using-the-iguazio-feature-store-with-azure-ml-part-3/

@@ -28,7 +28,7 @@ ___
 This project can run in different development environments:
 * Local computer (using PyCharm, VSCode, Jupyter, etc.)
 * Inside GitHub Codespaces 
-* Sagemaker studio and Studio Labs (free edition) or other managed Jupyter environments
+* Other managed Jupyter environments
 
 ### Install the code and mlrun client 
 
@@ -38,7 +38,7 @@ To install the package dependencies (not required in GitHub codespaces) use:
  
     make install-requirements
     
-If you prefer to use Conda or work in **Sagemaker** use this instead (to create and configure a conda env):
+If you prefer to use Conda use this instead (to create and configure a conda env):
 
     make conda-env
 
@@ -54,7 +54,7 @@ If your development environment support docker and have enough CPU resources run
     
 > MLRun UI can be viewed in: http://localhost:8060
     
-If your environment is minimal, or you are in Sagemaker, run mlrun as a process (no UI):
+If your environment is minimal, run mlrun as a process (no UI):
 
     [conda activate mlrun &&] make mlrun-api
  
