@@ -72,11 +72,12 @@ def create_and_set_project(
     project.set_source(git_source, pull_at_runtime=True)
 
     # Set the data collection function:
-    project.set_function(
+    data_collection_fn = project.set_function(
         "src/data_collection.py",
         name="data-collecting",
         kind="job",
     )
+    data_collection_fn.apply(mlrun.auto_mount())
 
     # Set the data preprocessing function:
     project.set_function(
