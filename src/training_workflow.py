@@ -4,7 +4,7 @@ from kfp import dsl
 
 @dsl.pipeline(name="MLOps Bot Master Pipeline")
 def kfpipeline(
-    html_links: list[str],
+    html_links: str,
     model_name: str,
     pretrained_tokenizer: str,
     pretrained_model: str,
@@ -21,7 +21,7 @@ def kfpipeline(
         function="data-collecting",
         handler="collect_html_to_text_files",
         name="data-collection",
-        params={"urls": html_links},
+        params={"urls_file": html_links},
         outputs=["html-as-text-files"],
     )
 
