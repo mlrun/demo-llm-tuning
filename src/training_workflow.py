@@ -8,10 +8,10 @@ def kfpipeline(
     model_name: str,
     pretrained_tokenizer: str,
     pretrained_model: str,
-    tokenizer_class: str,
-    model_class: str,
     epochs: str,
     use_deepspeed: bool,
+    tokenizer_class: str = "transformers.AutoTokenizer",
+    model_class: str = "transformers.AutoModelForCausalLM",
 ):
     # Get our project object:
     project = mlrun.get_current_project()
@@ -22,7 +22,7 @@ def kfpipeline(
         handler="collect_html_to_text_files",
         name="data-collection",
         params={"urls_file": html_links},
-        outputs=["html-as-text-files"],
+        returns=["html-as-text-files:path"],
     )
 
     # Dataset Preparation:
@@ -31,14 +31,14 @@ def kfpipeline(
         handler="prepare_dataset",
         name="data-preparation",
         inputs={"source_dir": collect_dataset_run.outputs["html-as-text-files"]},
-        outputs=["html-data"],
+        returns=["html-data:dataset"],
     )
 
     # Training:
-    project.get_function("mpi-training")
+    project.get_function("training")
 
     training_run = mlrun.run_function(
-        function="mpi-training",
+        function="training",
         name="train",
         inputs={"dataset": prepare_dataset_run.outputs["html-data"]},
         params={
@@ -48,10 +48,6 @@ def kfpipeline(
             "model_class": model_class,
             "tokenizer_class": tokenizer_class,
             "TRAIN_num_train_epochs": epochs,
-            "TRAIN_fp16": True,
-            "TRAIN_bf16": False,
-            "TRAIN_per_device_train_batch_size": 4,
-            "TRAIN_logging_strategy": "epoch",
             "use_deepspeed": use_deepspeed,
         },
         handler="train",
@@ -62,7 +58,11 @@ def kfpipeline(
     mlrun.run_function(
         function="training",
         name="evaluate",
-        params={"model_path": training_run.outputs["model"]},
+        params={
+            "model_path": training_run.outputs["model"],
+            "model_name": pretrained_model,
+            "tokenizer_name": pretrained_tokenizer,
+        },
         inputs={"data": prepare_dataset_run.outputs["html-data"]},
         handler="evaluate",
     )

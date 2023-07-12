@@ -9,9 +9,10 @@ import numpy as np
 import torch
 import transformers
 from mlrun.serving.v2_serving import V2ModelServer
+from peft import PeftModel
 
-SUBJECT_MARK = "Subject: "
-CONTENT_MARK = "\nContent: "
+SUBJECT_MARK = "### Human: "
+CONTENT_MARK = "\n### Assistant: "
 PROMPT_FORMAT = SUBJECT_MARK + "{}" + CONTENT_MARK
 
 
@@ -45,8 +46,10 @@ class LLMModelServer(V2ModelServer):
         self,
         context: mlrun.MLClientCtx = None,
         name: str = None,
-        model_class: str = None,
-        tokenizer_class: str = None,
+        model_class: str = "AutoModelForCausalLM",
+        tokenizer_class: str = "AutoTokenizer",
+        # model args:
+        model_args: dict = None,
         # Load from MLRun args:
         model_path: str = None,
         # Load from hub args:
@@ -56,6 +59,8 @@ class LLMModelServer(V2ModelServer):
         use_deepspeed: bool = False,
         n_gpus: int = 1,
         is_fp16: bool = True,
+        # peft model:
+        peft_model: str = None,
         # Inference args:
         **class_args,
     ):
@@ -73,12 +78,18 @@ class LLMModelServer(V2ModelServer):
 
         # Save hub loading parameters:
         self.model_name = model_name
-        self.tokenizer_name = tokenizer_name
+        self.tokenizer_name = tokenizer_name or self.model_name
+
+        # Save load model arguments:
+        self.model_args = model_args
 
         # Save deepspeed parameters:
         self.use_deepspeed = use_deepspeed
         self.n_gpus = n_gpus
         self.is_fp16 = is_fp16
+
+        # PEFT parameters:
+        self.peft_model = peft_model
 
         # Prepare variables for future use:
         self.model = None
@@ -108,14 +119,16 @@ class LLMModelServer(V2ModelServer):
                 replace_method="auto",
                 replace_with_kernel_inject=True,
             )
+        if self.peft_model:
+            self._load_peft_model()
 
-    def _load_from_mlrun(self):
+    def _extract_model(self, url):
         # Get the model artifact and file:
         (
             model_file,
             model_artifact,
             extra_data,
-        ) = mlrun.artifacts.get_model(self.model_path)
+        ) = mlrun.artifacts.get_model(url)
 
         # Read the name:
         model_name = model_artifact.spec.db_key
@@ -124,10 +137,21 @@ class LLMModelServer(V2ModelServer):
         model_directory = os.path.join(os.path.dirname(model_file), model_name)
         with zipfile.ZipFile(model_file, "r") as zip_file:
             zip_file.extractall(model_directory)
+        return model_directory
+
+    def _load_peft_model(self):
+        model_directory = self._extract_model(self.peft_model)
+        self.model = PeftModel.from_pretrained(self.model, model_directory)
+        self.model.eval()
+
+    def _load_from_mlrun(self):
+        model_directory = self._extract_model(self.model_path)
 
         # Loading the saved pretrained tokenizer and model:
         self.tokenizer = self._tokenizer_class.from_pretrained(model_directory)
-        self.model = self._model_class.from_pretrained(model_directory)
+        self.model = self._model_class.from_pretrained(
+            model_directory, **self.model_args
+        )
 
     def _load_from_hub(self):
         # Loading the pretrained tokenizer and model:
@@ -135,7 +159,9 @@ class LLMModelServer(V2ModelServer):
             self.tokenizer_name,
             model_max_length=512,
         )
-        self.model = self._model_class.from_pretrained(self.model_name)
+        self.model = self._model_class.from_pretrained(
+            self.model_name, **self.model_args
+        )
 
     def predict(self, request: Dict[str, Any]) -> dict:
         # Get the inputs:
@@ -143,20 +169,18 @@ class LLMModelServer(V2ModelServer):
         prompt = kwargs.pop("prompt")[0]
 
         # Tokenize:
-        input_ids = self.tokenizer.encode(prompt, return_tensors="pt")
-        if self.use_deepspeed:
-            input_ids = input_ids.cuda()
+        inputs = self.tokenizer(prompt, return_tensors="pt")["input_ids"]
+        if self.model.device.type == "cuda":
+            inputs = inputs.cuda()
 
-        # Create the attention mask and pad token id:
-        attention_mask = torch.ones_like(input_ids)
+        # Get the pad token id:
         pad_token_id = self.tokenizer.eos_token_id
 
         # Infer through the model:
         output = self.model.generate(
-            input_ids,
+            input_ids=inputs,
             do_sample=True,
             num_return_sequences=1,
-            attention_mask=attention_mask,
             pad_token_id=pad_token_id,
             **kwargs,
         )

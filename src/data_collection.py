@@ -3,11 +3,10 @@ import re
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-import mlrun
 from bs4 import BeautifulSoup, Tag
 
 ARTICLE_TOKEN = "Article: "
-HEADER_TOKEN = "Subject: "
+HEADER_TOKEN = "### Human: "
 
 
 def normalize(s: str) -> str:
@@ -57,7 +56,6 @@ def get_html_as_string(url: str, mark_headers: bool) -> str:
     return soup.get_text()
 
 
-@mlrun.handler(outputs=["html-as-text-files:directory"])
 def collect_html_to_text_files(urls_file: str, mark_headers=True) -> str:
     """
     Retrieve all html text content from URLs as text files.
