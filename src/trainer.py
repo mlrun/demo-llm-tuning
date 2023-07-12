@@ -1,4 +1,3 @@
-import json
 import os
 import shutil
 import tempfile
@@ -17,12 +16,13 @@ from mlrun.datastore import DataItem
 from mlrun.execution import MLClientCtx
 from mlrun.frameworks._common import CommonTypes, MLRunInterface
 from mlrun.utils import create_class
+from peft import LoraConfig, PeftModel, get_peft_model, prepare_model_for_kbit_training
 from plotly import graph_objects as go
 from transformers import (
+    AutoModelForCausalLM,
     AutoTokenizer,
+    BitsAndBytesConfig,
     DataCollatorForLanguageModeling,
-    GPT2LMHeadModel,
-    GPT2Tokenizer,
     PreTrainedModel,
     PreTrainedTokenizer,
     Trainer,
@@ -31,9 +31,6 @@ from transformers import (
     TrainerState,
     TrainingArguments,
 )
-
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "true"
 
 DEEPSPEED_CONFIG = {
     "fp16": {
@@ -328,7 +325,21 @@ def _get_sub_dict_by_prefix(src: Dict, prefix_key: str) -> Dict[str, Any]:
     }
 
 
-# ---------------------- Hugging Face Trainer --------------------------------
+def print_trainable_parameters(model):
+    """
+    Prints the number of trainable parameters in the model.
+    """
+    trainable_params = 0
+    all_param = 0
+    for _, param in model.named_parameters():
+        all_param += param.numel()
+        if param.requires_grad:
+            trainable_params += param.numel()
+    print(
+        f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}"
+    )
+
+
 def train(
     context: MLClientCtx,
     dataset: DataItem = None,
@@ -339,33 +350,20 @@ def train(
     model_name: str = "huggingface-model",
     use_deepspeed: bool = True,
 ):
-    """
-    Training a model with HuggingFace transformers api.
-
-    :param context:                 MLRun context
-    :param dataset:                 The uri of the training dataset, should be passed as input.
-    :param pretrained_tokenizer:    the pretrained tokenizer name that correspond the model.
-                                    (supported by Hugging Face API)
-    :param pretrained_model:        the pretrained model name to train (supported by Hugging Face API)
-    :param model_class:             The model class of the model, e.g., "transformers.GPT2LMHeadModel"
-    :param tokenizer_class:         The tokenizer class of the model, e.g., "transformers.AutoTokenizer"
-    :param model_name:              The name of the trained model (will be saved in the project with this name)
-    :param use_deepspeed:           Either to use deepspeed or not. Recommended for fine-tuning LLMs.
-    """
     torch.cuda.empty_cache()
-    deepspeed_config_json = None
-    if use_deepspeed:
-        deepspeed_config_json = os.path.join(tempfile.mkdtemp(), "ds_config.json")
-        with open(deepspeed_config_json, "w") as f:
-            json.dump(DEEPSPEED_CONFIG, f)
-    # Creating tokenizer:
+    # deepspeed_config_json = None
+    # if use_deepspeed:
+    #     deepspeed_config_json = os.path.join(tempfile.mkdtemp(), "ds_config.json")
+    #     with open(deepspeed_config_json, "w") as f:
+    #         json.dump(DEEPSPEED_CONFIG, f)
     if tokenizer_class:
         tokenizer_class = create_class(tokenizer_class)
     else:
         tokenizer_class = AutoTokenizer
 
     tokenizer = tokenizer_class.from_pretrained(
-        pretrained_tokenizer, model_max_length=512
+        pretrained_tokenizer,
+        model_max_length=512,
     )
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -388,12 +386,11 @@ def train(
     train_kwargs = _get_sub_dict_by_prefix(
         src=context.parameters, prefix_key=KWArgsPrefixes.TRAIN
     )
-    if use_deepspeed:
-        train_kwargs["deepspeed"] = deepspeed_config_json
+    # if use_deepspeed:
+    #     train_kwargs["deepspeed"] = deepspeed_config_json
     model_class_kwargs = _get_sub_dict_by_prefix(
         src=context.parameters, prefix_key=KWArgsPrefixes.MODEL_CLASS
     )
-
     # Loading our pretrained model:
     model_class_kwargs["pretrained_model_name_or_path"] = (
         model_class_kwargs.get("pretrained_model_name_or_path") or pretrained_model
@@ -404,15 +401,48 @@ def train(
             "Must provide pretrained_model name as "
             "function argument or in extra params"
         )
-    model = create_class(model_class).from_pretrained(**model_class_kwargs)
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16,
+    )
+
+    model = create_class(model_class).from_pretrained(
+        quantization_config=bnb_config,
+        device_map="auto",
+        trust_remote_code=True,
+        **model_class_kwargs,
+    )
+
+    model.gradient_checkpointing_enable()
+    model = prepare_model_for_kbit_training(model)
 
     # Preparing training arguments:
     training_args = TrainingArguments(
         output_dir=tempfile.mkdtemp(),
+        optim="paged_adamw_8bit",
+        gradient_accumulation_steps=2,
+        warmup_steps=5,
+        learning_rate=3e-4,
+        fp16=True,
+        logging_steps=1,
         **train_kwargs,
     )
 
-    trainer = Trainer(
+    config = LoraConfig(
+        r=16,
+        lora_alpha=16,
+        target_modules=["query_key_value"],
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM",
+    )
+
+    model = get_peft_model(model, config)
+    print_trainable_parameters(model)
+
+    trainer = transformers.Trainer(
         model=model,
         args=training_args,
         train_dataset=tokenized_train,
@@ -422,12 +452,15 @@ def train(
     )
 
     apply_mlrun(trainer, model_name=model_name)
+    model.config.use_cache = (
+        False  # silence the warnings. Please re-enable for inference!
+    )
 
     # Apply training with evaluation:
     context.logger.info(f"training '{model_name}'")
     trainer.train()
 
-    temp_directory = tempfile.gettempdir()
+    temp_directory = tempfile.TemporaryDirectory().name
     trainer.save_model(temp_directory)
 
     # Zip the model directory:
@@ -447,7 +480,13 @@ def train(
     )
 
 
-def evaluate(context, model_path, data: pd.DataFrame):
+def evaluate(
+    context,
+    model_path,
+    data: pd.DataFrame,
+    model_name: str = None,
+    tokenizer_name: str = None,
+):
     """
     Evaluating the model using perplexity, for more information visit:
     https://huggingface.co/docs/transformers/perplexity
@@ -455,6 +494,8 @@ def evaluate(context, model_path, data: pd.DataFrame):
     :param context:     mlrun context
     :param model_path:  path to the model directory
     :param data:        the data to evaluate the model
+    :param model_name:  name of base model
+    :param tokenizer_name: name of base tokenizer
     """
     # Get the model artifact and file:
     (
@@ -464,20 +505,25 @@ def evaluate(context, model_path, data: pd.DataFrame):
     ) = mlrun.artifacts.get_model(model_path)
 
     # Read the name:
-    model_name = model_artifact.spec.db_key
+    _model_name = model_artifact.spec.db_key
 
     # Extract logged model files:
-    model_directory = os.path.join(os.path.dirname(model_file), model_name)
+    model_directory = os.path.join(os.path.dirname(model_file), _model_name)
     with zipfile.ZipFile(model_file, "r") as zip_file:
         zip_file.extractall(model_directory)
 
     # Loading the saved pretrained tokenizer and model:
     dataset = Dataset.from_pandas(data)
-    tokenizer = GPT2Tokenizer.from_pretrained(model_directory)
-    model = GPT2LMHeadModel.from_pretrained(model_directory)
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+    pad_token_id = tokenizer.eos_token_id
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name, device_map="cuda:0", trust_remote_code=True, load_in_8bit=True
+    )
+    model = PeftModel.from_pretrained(model, model_directory)
+    model.eval()
     encodings = tokenizer("\n\n".join(dataset["text"][:5]), return_tensors="pt")
 
-    max_length = model.config.n_positions
+    max_length = 1024
     stride = 512
     seq_len = encodings.input_ids.size(1)
 
@@ -491,7 +537,7 @@ def evaluate(context, model_path, data: pd.DataFrame):
         target_ids[:, :-trg_len] = -100
 
         with torch.no_grad():
-            outputs = model(input_ids, labels=target_ids)
+            outputs = model(input_ids.cuda(), labels=target_ids)
 
             # loss is calculated using CrossEntropyLoss which averages over valid labels
             # N.B. the model only calculates loss over trg_len - 1 labels, because it internally shifts the labels

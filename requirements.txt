@@ -7,3 +7,5 @@ datasets
 accelerate
 evaluate
 bs4
+einops
+xformers
