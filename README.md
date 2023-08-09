@@ -2,7 +2,7 @@
 
 <img src="./images/hf-ds-mlrun.png" alt="huggingface-mlrun" style="width: 500px"/>
 
-This demo demonstrates how to fine tune a LLM and build an ML application: the **MLOps master bot**! We'll train [`gpt2-medium`](https://huggingface.co/gpt2) on [**Iguazio**'s MLOps blogs](https://www.iguazio.com/blog/) and cover how easy it is to take a model and code from development to production. Even if its a big scary LLM model, MLRun will take care of the dirty work!
+This demo demonstrates how to fine tune a LLM and build an ML application: the **MLOps master bot**! We'll train  [`falcon-7b`](https://huggingface.co/tiiuae/falcon-7b) on [**Iguazio**'s MLOps blogs](https://www.iguazio.com/blog/) and cover how easy it is to take a model and code from development to production. Even if its a big scary LLM model, MLRun will take care of the dirty work!
 
 We will use:
 * [**HuggingFace**](https://huggingface.co/) - as the main machine learning framework to get the model and tokenizer.
@@ -11,7 +11,7 @@ We will use:
 
 The demo contains a single [notebook](./tutorial.ipynb) that covers the two main stages in every MLOps project: 
 
-* **Training Pipeline Automation** - Demonstrating how to get an existing model (`GPT2-Medium`) from HuggingFace's Transformers package and operationalize it through all of its life cycle phases: data collection, data ppreparation, training and evaluation, as a fully automated pipeline.
+* **Training Pipeline Automation** - Demonstrating how to get an existing model (`falcon-7b`) from HuggingFace's Transformers package and operationalize it through all of its life cycle phases: data collection, data ppreparation, training and evaluation, as a fully automated pipeline.
 * **Application Serving Pipeline** - Showing how to productize the newly trained LLM as a serverless function.
 
 You can find all the python source code under [/src](./src)
