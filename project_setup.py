@@ -33,7 +33,7 @@ def setup(
             name="image-builder",
             handler="assert_build",
             kind="job",
-            image="mlrun/ml-models-gpu",
+            image="mlrun/mlrun-gpu",
             requirements=[
                 "torch",
                 "transformers[deepspeed]",
