@@ -45,7 +45,9 @@ def setup(
         )
         assert image_builder.deploy()
         default_image = image_builder.spec.image
-    project.set_default_image(project.get_param("default_image"))
+        project.set_default_image(default_image)
+    else:
+        project.set_default_image(project.get_param("default_image"))
 
     # Set the project git source:
 
